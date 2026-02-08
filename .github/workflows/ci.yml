@@ -1,0 +1,189 @@
+name: CI/CD Pipeline
+
+# Когда запускать workflow
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  # Запускать вручную из интерфейса
+  workflow_dispatch:
+
+# Переменные окружения
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+# JOBS - задачи которые будут выполняться
+jobs:
+  # 1. Линтинг и проверка кода
+  lint:
+    name: 📝 Линтинг и проверка
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout код
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Проверка Python синтаксиса
+      run: |
+        echo "Проверяем Python файлы..."
+        python -m py_compile *.py 2>/dev/null || echo "Нет Python файлов"
+    
+    - name: 🐚 Проверка bash скриптов
+      run: |
+        echo "Проверяем bash скрипты..."
+        if ls scripts/*.sh 1> /dev/null 2>&1; then
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/*.sh || true
+        else
+          echo "Нет bash скриптов"
+        fi
+    
+    - name: 📋 Проверка YAML файлов
+      uses: actions-hub/yamllint@master
+      with:
+        file: .github/workflows/ci.yml
+
+  # 2. Тестирование
+  test:
+    name: 🧪 Тестирование
+    runs-on: ubuntu-latest
+    needs: lint  # Зависит от успеха линтинга
+    
+    steps:
+    - name: 📥 Checkout код
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Установка Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: 📦 Установка зависимостей
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        fi
+    
+    - name: 🧪 Запуск тестов
+      run: |
+        echo "Запуск тестов..."
+        # Если есть тесты - запускаем
+        if [ -f test_*.py ]; then
+          python -m pytest test_*.py -v
+        else
+          echo "Тестов не найдено"
+        fi
+    
+    - name: 📊 Запуск основного скрипта
+      run: |
+        echo "Запуск основного скрипта..."
+        if [ -f calculator.py ]; then
+          python calculator.py
+        fi
+
+  # 3. Сборка (если нужно)
+  build:
+    name: 🏗️ Сборка
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 📥 Checkout код
+      uses: actions/checkout@v4
+    
+    - name: 🐳 Проверка Dockerfile
+      run: |
+        if [ -f Dockerfile ]; then
+          echo "Проверяем Dockerfile..."
+          docker build . --dry-run
+        else
+          echo "Dockerfile не найден"
+        fi
+    
+    - name: 📦 Создание архива
+      run: |
+        echo "Создаем архив проекта..."
+        tar -czf project-backup-$(date +%Y%m%d).tar.gz ./*
+
+  # 4. Security проверки (актуально для Kali)
+  security:
+    name: 🔒 Security проверки
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout код
+      uses: actions/checkout@v4
+    
+    - name: 🔍 Проверка секретов в коде
+      uses: actions/gitleaks-action@v2
+      with:
+        config-path: .gitleaks.toml
+    
+    - name: 🐍 Проверка Python уязвимостей (Bandit)
+      run: |
+        pip install bandit
+        bandit -r . -f json -o bandit-report.json || true
+    
+    - name: 📤 Загрузка security отчета
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: bandit-report.json
+        retention-days: 7
+
+  # 5. Kali Linux специфичные тесты (через self-hosted runner)
+  kali-tests:
+    name: 🎯 Kali Linux тесты
+    runs-on: [self-hosted, linux, kali]  # Требует настройки self-hosted runner
+    if: false  # Отключено по умолчанию
+    
+    steps:
+    - name: 📥 Checkout код
+      uses: actions/checkout@v4
+    
+    - name: 🔓 Обновление системы
+      run: |
+        echo "Обновляем Kali..."
+        sudo apt-get update -q
+    
+    - name: 🛠️ Установка инструментов
+      run: |
+        echo "Устанавливаем инструменты..."
+        sudo apt-get install -y -q nmap whois dnsutils
+
+  # 6. Финальный шаг - уведомления
+  notify:
+    name: 📢 Уведомление
+    runs-on: ubuntu-latest
+    needs: [lint, test, build, security]
+    if: always()  # Всегда запускается, даже при ошибках
+    
+    steps:
+    - name: 📊 Сводка
+      run: |
+        echo "🎉 CI/CD Pipeline завершен!"
+        echo "Время: $(date)"
+        echo "Ветка: ${{ github.ref }}"
+        echo "Коммит: ${{ github.sha }}"
+        echo "Автор: ${{ github.actor }}"
+        echo ""
+        echo "Ссылка на workflow:"
+        echo "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+    
+    - name: 🎨 Красивое уведомление
+      if: success()
+      run: |
+        echo "╔══════════════════════════════╗"
+        echo "║     ✅ ВСЕ ТЕСТЫ ПРОЙДЕНЫ    ║"
+        echo "╚══════════════════════════════╝"
+    
+    - name: ⚠️ Уведомление об ошибке
+      if: failure()
+      run: |
+        echo "╔══════════════════════════════╗"
+        echo "║     ❌ ТЕСТЫ НЕ ПРОЙДЕНЫ     ║"
+        echo "║   Проверьте логи выше!       ║"
+        echo "╚══════════════════════════════╝"

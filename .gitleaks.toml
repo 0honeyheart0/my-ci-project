@@ -1,0 +1,20 @@
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+description = "AWS Access Key ID"
+regex = '''(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'''
+
+[[rules]]
+description = "GitHub Token"
+regex = '''(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36}'''
+
+[[rules]]
+description = "SSH private key"
+regex = '''-----BEGIN [A-Z]+ PRIVATE KEY-----'''
+
+[[rules]]
+description = "Email в коде"
+regex = '''\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'''
