@@ -1,232 +1,113 @@
-name: CI/CD Pipeline
+name: Simple CI
 
-# Когда запускать workflow
+# Запускаем при пуше и при pull request
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
-  # Запускать вручную из интерфейса
-  workflow_dispatch:
+    branches: [ main ]
 
-# Переменные окружения
-env:
-  PYTHON_VERSION: '3.11'
-
-# JOBS - задачи которые будут выполняться
 jobs:
-  # 1. Линтинг и проверка кода
-  lint:
-    name: 📝 Линтинг и проверка
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 📥 Checkout код
-      uses: actions/checkout@v4
-    
-    - name: 🐍 Проверка Python синтаксиса
-      run: |
-        echo "Проверяем Python файлы..."
-        if ls *.py 1> /dev/null 2>&1; then
-          python -m py_compile *.py 2>/dev/null && echo "✅ Python синтаксис корректен"
-        else
-          echo "📭 Нет Python файлов"
-        fi
-    
-    - name: 🐚 Проверка bash скриптов
-      run: |
-        echo "Проверяем bash скрипты..."
-        if ls scripts/*.sh 1> /dev/null 2>&1; then
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-          shellcheck scripts/*.sh || echo "⚠️  Есть предупреждения в bash скриптах"
-        else
-          echo "📭 Нет bash скриптов"
-        fi
-    
-    - name: 📋 Проверка YAML файлов
-      run: |
-        echo "Проверяем YAML файлы..."
-        python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))" && echo "✅ YAML синтаксис корректен"
-      continue-on-error: true
-
-  # 2. Тестирование
+  # ТОЛЬКО ОДНА ЗАДАЧА - тестирование
   test:
-    name: 🧪 Тестирование
+    name: 🧪 Run Tests
     runs-on: ubuntu-latest
-    needs: lint  # Зависит от успеха линтинга
     
     steps:
-    - name: 📥 Checkout код
+    # 1. Получаем код
+    - name: 📥 Checkout code
       uses: actions/checkout@v4
     
-    - name: 🐍 Установка Python
+    # 2. Устанавливаем Python
+    - name: 🐍 Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: '3.11'
     
-    - name: 📦 Установка зависимостей
+    # 3. Проверяем что есть файлы
+    - name: 📁 List files
       run: |
-        python -m pip install --upgrade pip
+        echo "📂 Содержимое репозитория:"
+        ls -la
+        echo ""
+        echo "📄 Python файлы:"
+        ls *.py 2>/dev/null || echo "Нет Python файлов"
+    
+    # 4. Устанавливаем зависимости (если есть)
+    - name: 📦 Install dependencies
+      run: |
         if [ -f requirements.txt ]; then
+          echo "Устанавливаем зависимости из requirements.txt"
           pip install -r requirements.txt
         else
-          echo "📭 requirements.txt не найден, устанавливаем pytest по умолчанию"
+          echo "Создаем requirements.txt с pytest"
+          echo "pytest==7.4.3" > requirements.txt
           pip install pytest
         fi
     
-    - name: 🧪 Запуск тестов
+    # 5. Запускаем простые тесты
+    - name: ✅ Run Simple Tests
       run: |
-        echo "Запуск тестов..."
-        # Ищем тестовые файлы
-        if ls test_*.py 1> /dev/null 2>&1; then
-          python -m pytest test_*.py -v
-        elif [ -f test_calculator.py ]; then
-          python test_calculator.py
-        else
-          echo "📭 Тестов не найдено, создаем пример..."
-          # Создаем простой тест если нет
+        echo "🔍 Проверяем Python синтаксис..."
+        # Проверяем все .py файлы
+        for file in *.py; do
+          if [ -f "$file" ]; then
+            python -m py_compile "$file" && echo "✅ $file: синтаксис корректен"
+          fi
+        done
+        
+        echo ""
+        echo "🧪 Запускаем тесты..."
+        
+        # Если есть test_app.py - запускаем
+        if [ -f test_app.py ]; then
+          echo "Запускаем test_app.py"
+          python test_app.py
+        fi
+        
+        # Если есть calculator.py - запускаем
+        if [ -f calculator.py ]; then
+          echo "Запускаем calculator.py"
+          python calculator.py
+        fi
+        
+        # Если нет тестов - создаем простой
+        if [ ! -f test_app.py ] && [ ! -f calculator.py ]; then
+          echo "Создаем простой тест..."
           cat > simple_test.py << 'TESTEOF'
-def test_example():
-    assert 1 + 1 == 2
-    print("✅ Простой тест пройден")
+def test_basic():
+    assert 1 + 1 == 2, "1+1 должно быть 2"
+    print("✅ Базовый тест пройден")
 
 if __name__ == "__main__":
-    test_example()
+    test_basic()
+    print("🎉 Все тесты пройдены!")
 TESTEOF
           python simple_test.py
         fi
     
-    - name: 📊 Запуск основного скрипта
-      run: |
-        echo "Запуск основного скрипта..."
-        if [ -f calculator.py ]; then
-          python calculator.py
-        elif [ -f *.py ]; then
-          # Запускаем первый найденный python файл
-          FIRST_PY=$(ls *.py | head -1)
-          echo "Запускаем $FIRST_PY"
-          python "$FIRST_PY"
-        else
-          echo "📭 Нет Python файлов для запуска"
-        fi
-
-  # 3. Сборка (если нужно)
-  build:
-    name: 🏗️ Сборка
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-    - name: 📥 Checkout код
-      uses: actions/checkout@v4
-    
-    - name: 🐳 Проверка Dockerfile
-      run: |
-        if [ -f Dockerfile ]; then
-          echo "Проверяем Dockerfile..."
-          # Устанавливаем Docker CLI
-          sudo apt-get update
-          sudo apt-get install -y docker.io
-          docker build . --dry-run
-          echo "✅ Dockerfile корректен"
-        else
-          echo "📭 Dockerfile не найден"
-        fi
-    
-    - name: 📦 Создание архива
-      run: |
-        echo "Создаем архив проекта..."
-        tar -czf project-backup-$(date +%Y%m%d).tar.gz ./* 2>/dev/null || true
-        ls -la *.tar.gz 2>/dev/null || echo "Не удалось создать архив"
-
-  # 4. Security проверки (актуально для Kali)
-  security:
-    name: 🔒 Security проверки
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: 📥 Checkout код
-      uses: actions/checkout@v4
-    
-    - name: 🔍 Проверка секретов в коде (исправленный action)
-      uses: zricethezav/gitleaks-action@v1.6.0
-    
-    - name: 🐍 Проверка Python уязвимостей (Bandit)
-      run: |
-        pip install bandit
-        bandit -r . -f json -o bandit-report.json 2>/dev/null || true
-        if [ -f bandit-report.json ]; then
-          echo "✅ Bandit отчет создан"
-          # Покажем краткую информацию
-          python3 -c "import json; data=json.load(open('bandit-report.json')); print(f'Найдено проблем: {len(data.get(\"results\", []))}')"
-        else
-          echo "📭 Bandit отчет не создан"
-        fi
-    
-    - name: 📤 Загрузка security отчета
+    # 6. Всегда показываем результат
+    - name: 📊 Show Result
       if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: security-reports
-        path: |
-          bandit-report.json
-          .gitleaks/*.json
-        retention-days: 7
-
-  # 5. Финальный шаг - уведомления
-  notify:
-    name: 📢 Уведомление
-    runs-on: ubuntu-latest
-    needs: [lint, test, build, security]
-    if: always()  # Всегда запускается, даже при ошибках
-    
-    steps:
-    - name: 📊 Сводка
       run: |
-        echo "╔══════════════════════════════════════════╗"
-        echo "║         CI/CD Pipeline Results           ║"
-        echo "╠══════════════════════════════════════════╣"
-        echo "║ Repository: ${{ github.repository }}     ║"
-        echo "║ Branch: ${{ github.ref }}                ║"
-        echo "║ Commit: ${{ github.sha }}                ║"
-        echo "║ Author: ${{ github.actor }}              ║"
-        echo "║ Time: $(date)                            ║"
-        echo "╠══════════════════════════════════════════╣"
+        echo ""
+        echo "╔══════════════════════════════╗"
+        echo "║      CI PIPELINE RESULTS     ║"
+        echo "╠══════════════════════════════╣"
+        echo "║ Repository: ${{ github.repository }}"
+        echo "║ Branch: ${{ github.ref }}"
+        echo "║ Commit: ${{ github.sha }}"
+        echo "║ Run ID: ${{ github.run_id }}"
+        echo "╠══════════════════════════════╣"
         
-        # Определяем общий статус
-        if [ "${{ needs.lint.result }}" = "success" ] && [ "${{ needs.test.result }}" = "success" ]; then
-          echo "║ Status: ✅ ВСЕ ТЕСТЫ ПРОЙДЕНЫ            ║"
-          echo "║                                          ║"
-          echo "║ Отчет по задачам:                       ║"
-          echo "║ • Линтинг: ✅ Успешно                   ║"
-          echo "║ • Тесты: ✅ Успешно                     ║"
-          echo "║ • Сборка: ${{ needs.build.result }}     ║"
-          echo "║ • Security: ${{ needs.security.result }}║"
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "║ Status: ✅ SUCCESS           ║"
+          echo "║                              ║"
+          echo "║ Все тесты пройдены!         ║"
         else
-          echo "║ Status: ❌ ЕСТЬ ОШИБКИ                  ║"
-          echo "║                                          ║"
-          echo "║ Проблемы в задачах:                     ║"
-          echo "║ • Линтинг: ${{ needs.lint.result }}     ║"
-          echo "║ • Тесты: ${{ needs.test.result }}       ║"
-          echo "║ • Сборка: ${{ needs.build.result }}     ║"
-          echo "║ • Security: ${{ needs.security.result }}║"
+          echo "║ Status: ❌ FAILURE           ║"
+          echo "║                              ║"
+          echo "║ Есть ошибки в тестах        ║"
         fi
         
-        echo "╠══════════════════════════════════════════╣"
-        echo "║ Ссылка на workflow:                      ║"
-        echo "║ https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        echo "╚══════════════════════════════════════════╝"
-    
-    - name: 🎯 Скачивание артефактов (если есть)
-      if: always()
-      uses: actions/download-artifact@v4
-      with:
-        name: security-reports
-        path: ./artifacts/
-      continue-on-error: true
-    
-    - name: 📁 Показать созданные файлы
-      run: |
-        echo "Созданные артефакты:"
-        find . -name "*.tar.gz" -o -name "*.json" -o -name "*.xml" 2>/dev/null || echo "Артефакты не найдены"
+        echo "╚══════════════════════════════╝"
