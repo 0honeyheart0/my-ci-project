@@ -10,44 +10,36 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
     steps:
     - name:  Checkout code
       uses: actions/checkout@v4
-    
     - name:  Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
     - name: List files
       run: |
         echo " Files in repository:"
         ls -la
-    
     - name:  Run Tests
       run: |
         echo " Running tests..."
-        
         # Проверяем Python синтаксис
         for file in *.py; do
           if [ -f "$file" ]; then
             python -m py_compile "$file" && echo " $file: syntax OK"
           fi
         done
-        
         # Если есть test_app.py - запускаем
         if [ -f test_app.py ]; then
           echo "Running test_app.py..."
           python test_app.py
         fi
-        
         # Если есть calculator.py - запускаем
         if [ -f calculator.py ]; then
           echo "Running calculator.py..."
           python calculator.py
         fi
-        
         # Если нет тестов - создаем простой
         if [ ! -f test_app.py ] && [ ! -f calculator.py ]; then
           echo "Creating simple test..."
@@ -59,16 +51,3 @@ def test_basic():
 if __name__ == "__main__":
     test_basic()
     print(" Все тесты пройдены!")
-TESTEOF
-          python simple_test.py
-        fi
-    
-    - name: Show Result
-      if: always()
-      run: |
-        echo "╔══════════════════════════╗"
-        echo "║     CI COMPLETED        ║"
-        echo "╠══════════════════════════╣"
-        echo "║ Status: ${{ job.status }}"
-        echo "║ Run: ${{ github.run_id }}"
-        echo "╚══════════════════════════╝"
