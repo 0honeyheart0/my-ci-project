@@ -1,0 +1,21 @@
+name: Simple Test
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run simple test
+      run: |
+        echo "GitHub Actions CI/CD работает!"
+        echo "Текущая директория: $(pwd)"
+        echo "Список файлов:"
+        ls -la
+        
+        # Простейший Python тест
+        python3 -c "print('Python работает'); assert 1+1==2; print('Математика работает')"
+        echo "Всё отлично!"
