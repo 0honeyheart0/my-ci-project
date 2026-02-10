@@ -19,3 +19,65 @@ jobs:
         # Простейший Python тест
         python3 -c "print('Python работает'); assert 1+1==2; print('Математика работает')"
         echo "Всё отлично!"
+
+  dast:
+    name: DAST Security Scan
+    runs-on: ubuntu-latest
+    needs: test  # Запускаем после успешных тестов
+    
+    services:
+      webapp:
+        image: python:3.11-alpine
+        ports:
+          - 5000:5000
+        options: >-
+          --health-cmd="wget --quiet --tries=1 --spider http://localhost:5000 || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        volumes:
+          - .:/app
+        working_dir: /app
+        env:
+          FLASK_ENV: production
+        # Запускаем приложение перед сканированием
+        run: |
+          pip install -r requirements.txt
+          python app.py
+    
+    steps:
+    - name:  Checkout code
+      uses: actions/checkout@v4
+    
+    - name:  Wait for application to start
+      run: |
+        echo "Waiting for webapp to start..."
+        timeout 60s bash -c '
+          until curl -s http://localhost:5000 > /dev/null; do
+            echo "Waiting..."
+            sleep 5
+          done
+          echo "✅ Application is running!"
+        '
+    
+    - name: Run OWASP ZAP Baseline Scan
+      uses: zaproxy/action-baseline@v0.10.0
+      with:
+        target: 'http://webapp:5000'
+        cmd_options: '-a'
+    
+    - name:  Generate ZAP report
+      if: always()
+      run: |
+        echo "ZAP scan completed"
+        ls -la zap_report.* 2>/dev/null || echo "No ZAP report generated"
+    
+    - name:  Upload ZAP report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: zap-security-report
+        path: |
+          zap_report.*
+          zap_alert.*
+        retention-days: 30
