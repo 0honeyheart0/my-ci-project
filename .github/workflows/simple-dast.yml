@@ -1,0 +1,72 @@
+name: Simple DAST
+
+on: [push, workflow_dispatch]
+
+jobs:
+  dast-simple:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: 🐳 Start application
+      run: |
+        # Запускаем приложение
+        docker-compose up -d
+        echo "Waiting for app..."
+        sleep 15
+        
+        # Проверяем что работает
+        curl -f http://localhost:5000 && echo "✅ App is running"
+    
+    - name: 🔍 Basic security checks
+      run: |
+        echo "Performing basic DAST checks..."
+        echo "================================="
+        
+        # 1. Проверка HTTP заголовков
+        echo "1. Checking security headers..."
+        curl -I http://localhost:5000 | grep -i "security\|x-" || echo "No security headers found"
+        
+        # 2. Проверка на SQL injection (простой тест)
+        echo ""
+        echo "2. Testing for SQL injection..."
+        RESPONSE=$(curl -s "http://localhost:5000/api/add?a=1' OR '1'='1&b=1")
+        if echo "$RESPONSE" | grep -q "error\|exception\|sql"; then
+          echo "❌ Possible SQL injection vulnerability"
+        else
+          echo "✅ SQL injection test passed"
+        fi
+        
+        # 3. Проверка на XSS (простой тест)
+        echo ""
+        echo "3. Testing for XSS..."
+        RESPONSE=$(curl -s "http://localhost:5000/api/add?a=<script>alert(1)</script>&b=1")
+        if echo "$RESPONSE" | grep -q "<script>\|alert\|javascript"; then
+          echo "❌ Possible XSS vulnerability"
+        else
+          echo "✅ XSS test passed"
+        fi
+        
+        # 4. Проверка на path traversal
+        echo ""
+        echo "4. Testing for path traversal..."
+        curl -s "http://localhost:5000/../../etc/passwd" | head -1 | grep -q "root:" && echo "❌ Path traversal possible" || echo "✅ Path traversal test passed"
+        
+        echo ""
+        echo "================================="
+        echo " Basic DAST checks completed"
+    
+    - name: Use wfuzz for fuzzing
+      run: |
+        echo "Installing wfuzz for endpoint discovery..."
+        pip install wfuzz
+        
+        echo "Discovering endpoints..."
+        wfuzz -c -z file,/usr/share/dict/words --hc 404 http://localhost:5000/FUZZ 2>/dev/null | head -20
+        
+        echo "Endpoint discovery completed"
+    
+    - name:  Cleanup
+      if: always()
+      run: docker-compose down
