@@ -45,7 +45,7 @@ jobs:
           -t ghcr.io/zaproxy/zaproxy:stable \
           zap-full-scan.py \
           -t http://localhost:5000 \
-          -r zap-report.html \
+          -r /zap/wrk/zap-report.html
           -I  # -I игнорирует предупреждения, не падает при ошибках
           
         echo "✅ ZAP scan completed"
