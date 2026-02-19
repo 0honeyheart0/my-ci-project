@@ -8,10 +8,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: 🐳 Setup Docker
+    - name:  Setup Docker
       uses: docker/setup-buildx-action@v2
     
-    - name: 🚀 Build and run with Docker
+    - name:  Build and run with Docker
       run: |
         # Собираем Docker образ
         docker build -t myapp .
@@ -25,21 +25,53 @@ jobs:
         # Проверяем
         curl -s http://localhost:5000 && echo "✅ App running in Docker"
     
-    - name: 🔍 Security test
+    - name:  Basic scan with nmap
       run: |
-        # Устанавливаем nmap
         sudo apt-get update
         sudo apt-get install -y nmap
         
-        # Сканируем
-        echo "Scanning application..."
+        echo "🔍 Scanning with nmap..."
         nmap -sV -p 5000 localhost
-        
-        # Проверяем endpoint'ы
-        curl -s http://localhost:5000/api/add?a=5&b=3 | jq . 2>/dev/null || curl -s http://localhost:5000/api/add?a=5&b=3
     
-    - name: 🧹 Cleanup
+    - name:  OWASP ZAP Full Scan
+      run: |
+        echo "🔍 Starting OWASP ZAP scan..."
+        
+        # Создаем папку для отчетов
+        mkdir -p zap-reports
+        
+        # Запускаем ZAP в Docker
+        docker run --network host -v $PWD/zap-reports:/zap/wrk:rw \
+          -t ghcr.io/zaproxy/zaproxy:stable \
+          zap-full-scan.py \
+          -t http://localhost:5000 \
+          -r zap-report.html \
+          -I  # -I игнорирует предупреждения, не падает при ошибках
+          
+        echo "✅ ZAP scan completed"
+      continue-on-error: true  # Не останавливает workflow при нахождении уязвимостей
+    
+    - name:  Upload ZAP Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: zap-security-report
+        path: zap-reports/zap-report.html
+        if-no-files-found: warn  # Предупреждает, если файл не создался
+    
+    - name: Show scan summary
+      run: |
+        echo "=== SCAN RESULTS ==="
+        echo "✅ Nmap scan completed"
+        if [ -f zap-reports/zap-report.html ]; then
+          echo "✅ ZAP report generated: zap-reports/zap-report.html"
+          echo "📊 Download it from Artifacts section"
+        else
+          echo "⚠️ ZAP report not found (scan may have failed)"
+        fi
+    
+    - name:  Cleanup
       if: always()
       run: |
         docker stop myapp-container 2>/dev/null || true
         docker rm myapp-container 2>/dev/null || true
+        echo "🧹 Cleanup completed"
