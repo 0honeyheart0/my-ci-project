@@ -1,72 +1,41 @@
 from flask import Flask, request, jsonify
+from prometheus_client import Counter, Histogram, generate_latest, REGISTRY
+import time
 
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head><title>Calculator API</title></head>
-    <body>
-        <h1>Calculator Web App</h1>
-        <p>DAST тестирование демо</p>
-        <h2>Endpoints:</h2>
-        <ul>
-            <li>GET /api/add?a=5&b=3</li>
-            <li>GET /api/subtract?a=5&b=3</li>
-            <li>POST /api/calculate { "operation": "add", "a": 5, "b": 3 }</li>
-            <li>GET /api/users (требует auth)</li>
-        </ul>
-    </body>
-    </html>
-    '''
+# Метрики
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests', ['method', 'endpoint'])
+REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'HTTP request latency', ['method', 'endpoint'])
+
+@app.before_request
+def before_request():
+    request.start_time = time.time()
+
+@app.after_request
+def after_request(response):
+    latency = time.time() - request.start_time
+    REQUEST_COUNT.labels(request.method, request.path).inc()
+    REQUEST_LATENCY.labels(request.method, request.path).observe(latency)
+    return response
+
+@app.route('/metrics')
+def metrics():
+    return generate_latest(REGISTRY), 200, {'Content-Type': 'text/plain'}
 
 @app.route('/api/add')
 def add():
-    a = request.args.get('a', 0, type=float)
-    b = request.args.get('b', 0, type=float)
-    return jsonify({'result': a + b})
+    try:
+        a = int(request.args.get('a', 0))
+        b = int(request.args.get('b', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Parameters a and b must be integers'}), 400
+    return jsonify(result=a + b)
 
-@app.route('/api/subtract')
-def subtract():
-    a = request.args.get('a', 0, type=float)
-    b = request.args.get('b', 0, type=float)
-    return jsonify({'result': a - b})
-
-@app.route('/api/calculate', methods=['POST'])
-def calculate():
-    data = request.json
-    op = data.get('operation', 'add')
-    a = data.get('a', 0)
-    b = data.get('b', 0)
-    
-    if op == 'add':
-        result = a + b
-    elif op == 'subtract':
-        result = a - b
-    else:
-        return jsonify({'error': 'Unknown operation'}), 400
-    
-    return jsonify({'result': result})
-
-@app.route('/api/users')
-def users():
-    # Эмуляция endpoint, требующего аутентификацию
-    auth = request.headers.get('Authorization')
-    if auth != 'Bearer secret-token':
-        return jsonify({'error': 'Unauthorized'}), 401
-    return jsonify({'users': ['user1', 'user2']})
-
-@app.route('/api/login', methods=['POST'])
-def login():
-    # Уязвимый endpoint для тестирования
-    username = request.form.get('username')
-    password = request.form.get('password')
-    
-    if username == 'admin' and password == 'admin123':
-        return jsonify({'token': 'secret-token'})
-    return jsonify({'error': 'Invalid credentials'}), 401
+@app.route('/')
+def home():
+    return "Hello, DAST with Prometheus!"
 
 if __name__ == '__main__':
+    # Важно: слушаем все интерфейсы (0.0.0.0), чтобы контейнер был доступен
     app.run(host='0.0.0.0', port=5000, debug=False)

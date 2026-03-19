@@ -1,0 +1,135 @@
+---
+- name: Initial server setup
+  hosts: vps
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential packages
+      apt:
+        name:
+          - curl
+          - git
+          - htop
+          - ufw
+          - rsync
+        state: present
+
+    - name: Install dependencies for Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - software-properties-common
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: present
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add user to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Install Docker Python SDK via apt
+      apt:
+        name: python3-docker
+        state: present
+
+    - name: Create app directory
+      file:
+        path: /opt/myapp
+        state: directory
+
+    - name: Copy application files using synchronize (rsync)
+      synchronize:
+        src: ./
+        dest: /opt/myapp
+        delete: yes
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=inventory.ini"
+          - "--exclude=playbook.yml"
+      delegate_to: 127.0.0.1
+      become: false
+
+    - name: Build Docker image
+      docker_image:
+        name: myapp:latest
+        build:
+          path: /opt/myapp
+        source: build
+        state: present
+
+    - name: Run container
+      docker_container:
+        name: myapp
+        image: myapp:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "5000:5000"
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Deploy reverse proxy configuration
+      template:
+        src: nginx-reverse-proxy.conf.j2
+        dest: /etc/nginx/sites-available/myapp
+      notify: restart nginx
+
+    - name: Enable site
+      file:
+        src: /etc/nginx/sites-available/myapp
+        dest: /etc/nginx/sites-enabled/myapp
+        state: link
+      notify: restart nginx
+
+    - name: Ensure Nginx is running and enabled
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Allow HTTP in firewall (UFW)
+      ufw:
+        rule: allow
+        port: '80'
+        proto: tcp
+
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted
