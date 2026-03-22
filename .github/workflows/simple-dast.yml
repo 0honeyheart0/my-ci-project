@@ -31,7 +31,7 @@ jobs:
         # 2. Проверка на SQL injection (простой тест)
         echo ""
         echo "2. Testing for SQL injection..."
-        RESPONSE=$(curl -s "http://localhost:5000/api/add?a=1' OR '1'='1&b=1")
+        RESPONSE=$(curl -s "http://localhost:5000/api/add?a=1%27%20OR%20%271%27%3D%271&b=1")
         if echo "$RESPONSE" | grep -q "error\|exception\|sql"; then
           echo "❌ Possible SQL injection vulnerability"
         else
