@@ -23,7 +23,7 @@ def after_request(response):
 def metrics():
     return generate_latest(REGISTRY), 200, {'Content-Type': 'text/plain'}
 
-@app.route('/api/add')
+@app.route('/api/add') #d
 def add():
     try:
         a = int(request.args.get('a', 0))
