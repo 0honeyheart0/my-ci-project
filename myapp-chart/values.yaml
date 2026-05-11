@@ -1,0 +1,24 @@
+postgres:
+  serviceName: postgres
+  port: 5432
+  containerPort: 5432
+  user: myapp_user
+  database: myapp_db
+  password: mysecretpassword
+  storage:
+    size: 1Gi
+  image:
+    repository: postgres
+    tag: 15-alpine
+    pullPolicy: IfNotPresent
+
+app:
+  name: myapp
+  replicas: 1
+  image:
+    repository: myapp
+    tag: latest
+    pullPolicy: IfNotPresent
+  containerPort: 5000
+  servicePort: 80
+  jwtSecret: jwt-secret-key
