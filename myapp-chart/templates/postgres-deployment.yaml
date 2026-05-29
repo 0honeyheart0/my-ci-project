@@ -34,3 +34,4 @@ spec:
       - name: postgres-storage
         persistentVolumeClaim:
           claimName: {{ .Values.postgres.serviceName }}-pvc
+          

@@ -2,7 +2,7 @@ name: CI/CD to localhost on minikube
 
 on:
   push:
-    branches: [ main, rest-cd ]
+    branches: [ main, app ]
   workflow_dispatch:
 
 jobs:
