@@ -18,7 +18,6 @@ jobs:
       - name: Get image tag from build
         id: tag
         run: |
-          # Извлекаем короткий хэш коммита из последнего успешного билда
           COMMIT_SHA=$(git rev-parse --short HEAD)
           echo "tag=git-${COMMIT_SHA}" >> $GITHUB_OUTPUT
 

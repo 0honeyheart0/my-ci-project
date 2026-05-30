@@ -1,15 +1,30 @@
-- name: Run Bandit (SAST)
-  run: |
-    pip install bandit
-    bandit -r . -ll -f json -o bandit-report.json || true
-  continue-on-error: true
+name: Security Scan
 
-- name: Install Trivy
-  run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+on:
+  push:
+    branches: [ main, app ]
+  pull_request:
+    branches: [ main ]
 
-- name: Scan Docker image with Trivy
-  run: |
-    trivy image --severity HIGH,CRITICAL --no-progress ghcr.io/0honeyheart0/my-ci-project/myapp:latest
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-- name: Scan dependencies with Trivy (fs)
-  run: trivy fs --severity HIGH,CRITICAL --no-progress .
+      - name: Run Bandit (SAST)
+        run: |
+          pip install bandit
+          bandit -r . -ll -f json -o bandit-report.json || true
+        continue-on-error: true
+
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan Docker image with Trivy
+        run: |
+          trivy image --severity HIGH,CRITICAL --no-progress ghcr.io/0honeyheart0/my-ci-project/myapp:latest
+
+      - name: Scan dependencies with Trivy (fs)
+        run: trivy fs --severity HIGH,CRITICAL --no-progress .
