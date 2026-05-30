@@ -1,0 +1,40 @@
+name: Deploy to Minikube
+
+on:
+  workflow_run:
+    workflows: ["Build and Publish"]
+    types:
+      - completed
+    branches: [app, main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get image tag from build
+        id: tag
+        run: |
+          # Извлекаем короткий хэш коммита из последнего успешного билда
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          echo "tag=git-${COMMIT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Update Helm values
+        run: |
+          cd myapp-chart
+          helm upgrade myapp-release . --namespace myapp \
+            --set app.image.tag=${{ steps.tag.outputs.tag }} \
+            --reuse-values
+
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/myapp-flask -n myapp --timeout=2m
+
+      - name: Smoke test
+        run: |
+          kubectl port-forward -n myapp service/myapp-service 8080:80 &
+          sleep 5
+          curl -f http://localhost:8080 || exit 1
+          kill %1
