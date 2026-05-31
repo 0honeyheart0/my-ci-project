@@ -32,23 +32,20 @@ jobs:
           minikube status || minikube start --driver=docker --cpus=4 --memory=8192
           kubectl config use-context minikube
 
-      - name: Log in to GHCR (docker)
+      - name: Log in to GHCR
         run: |
           echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
 
-      - name: Debug image existence
+      - name: Pull and load image (debug)
         run: |
           IMAGE="ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}"
-          echo "Checking $IMAGE"
-          docker manifest inspect $IMAGE || echo "Image not found"
+          echo "Pulling $IMAGE"
+          docker pull $IMAGE || echo "Pull failed, will try to use local cache"
+          minikube image load $IMAGE || echo "Load failed"
+          # Проверка, что образ загружен
+          minikube image ls | grep ${{ steps.sha.outputs.short_sha }} || echo "Image not loaded"
 
-      - name: Pull and load image
-        run: |
-          IMAGE="ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}"
-          docker pull $IMAGE
-          minikube image load $IMAGE
-
-      - name: Deploy with Helm
+      - name: Deploy with Helm (use local image)
         run: |
           cd myapp-chart
           helm upgrade --install myapp-release . --namespace myapp --create-namespace \
