@@ -14,8 +14,7 @@ jobs:
     runs-on: self-hosted
     if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Determine commit SHA
         id: sha
@@ -33,17 +32,21 @@ jobs:
           minikube status || minikube start --driver=docker --cpus=4 --memory=8192
           kubectl config use-context minikube
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
+      - name: Log in to GHCR (docker)
+        run: |
+          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+
+      - name: Debug image existence
+        run: |
+          IMAGE="ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}"
+          echo "Checking $IMAGE"
+          docker manifest inspect $IMAGE || echo "Image not found"
 
       - name: Pull and load image
         run: |
-          docker pull ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}
-          minikube image load ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}
+          IMAGE="ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}"
+          docker pull $IMAGE
+          minikube image load $IMAGE
 
       - name: Deploy with Helm
         run: |
