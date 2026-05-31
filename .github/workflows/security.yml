@@ -20,6 +20,10 @@ jobs:
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
 
+      - name: Get short SHA
+        id: vars
+        run: echo "sha_short=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Run Bandit (SAST)
         run: |
           pip install bandit
@@ -31,7 +35,7 @@ jobs:
 
       - name: Scan Docker image with Trivy
         run: |
-          trivy image --severity HIGH,CRITICAL --no-progress ghcr.io/0honeyheart0/my-ci-project/myapp:latest
+          trivy image --severity HIGH,CRITICAL --no-progress ghcr.io/0honeyheart0/my-ci-project/myapp:git-${{ steps.vars.outputs.sha_short }}
 
       - name: Scan dependencies with Trivy (fs)
         run: trivy fs --severity HIGH,CRITICAL --no-progress .
