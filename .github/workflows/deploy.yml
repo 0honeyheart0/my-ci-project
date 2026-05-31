@@ -15,6 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Determine commit SHA
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+          else
+            COMMIT_SHA="${{ github.sha }}"
+          fi
+          echo "short_sha=git-${COMMIT_SHA::7}" >> $GITHUB_OUTPUT
+          echo "full_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
+
       - name: Start Minikube
         run: |
           minikube status || minikube start --driver=docker --cpus=4 --memory=8192
@@ -26,10 +37,6 @@ jobs:
           registry: ghcr.io
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Get short SHA
-        id: sha
-        run: echo "short_sha=git-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Pull and load image into Minikube
         run: |
