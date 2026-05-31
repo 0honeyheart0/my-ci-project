@@ -3,11 +3,6 @@ name: Deploy to Minikube
 on:
   push:
     branches: [ app, main ]
-  workflow_run:
-    workflows: ["Build and Publish"]
-    types:
-      - completed
-    branches: [app, main]
 
 jobs:
   deploy:
@@ -15,15 +10,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Determine commit SHA
+      - name: Get short SHA
         id: sha
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
-          else
-            COMMIT_SHA="${{ github.sha }}"
-          fi
-          SHORT_SHA=$(echo ${COMMIT_SHA} | cut -c1-7)
+          SHORT_SHA=$(git rev-parse --short HEAD)
           echo "short_sha=git-${SHORT_SHA}" >> $GITHUB_OUTPUT
 
       - name: Start Minikube
@@ -42,7 +32,6 @@ jobs:
         run: |
           docker pull ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}
           minikube image load ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}
-          # Проверка, что образ загружен
           minikube image ls | grep ${{ steps.sha.outputs.short_sha }}
 
       - name: Update Helm values
@@ -51,93 +40,27 @@ jobs:
           helm upgrade myapp-release . --namespace myapp \
             --set app.image.tag=${{ steps.sha.outputs.short_sha }} \
             --set app.image.pullPolicy=IfNotPresent \
-            --reuse-values
+            --reuse-values \
+            --install --create-namespace
 
-      - name: Force remove stale pods
+      - name: Force delete old pods
         run: |
           kubectl delete pod -l app=myapp -n myapp --force --grace-period=0 || true
-          sleep 10
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/myapp-flask -n myapp --timeout=5m
-          kubectl get pods -n myapp
-name: Deploy to Minikube
-
-on:
-  push:
-    branches: [ app, main ]
-  workflow_run:
-    workflows: ["Build and Publish"]
-    types:
-      - completed
-    branches: [app, main]
-
-jobs:
-  deploy:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Determine commit SHA
-        id: sha
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
-          else
-            COMMIT_SHA="${{ github.sha }}"
-          fi
-          SHORT_SHA=$(echo ${COMMIT_SHA} | cut -c1-7)
-          echo "short_sha=git-${SHORT_SHA}" >> $GITHUB_OUTPUT
-
-      - name: Start Minikube
-        run: |
-          minikube status || minikube start --driver=docker --cpus=4 --memory=8192
-          kubectl config use-context minikube
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ secrets.GHCR_USERNAME }}
-          password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Pull and load image into Minikube
-        run: |
-          docker pull ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}
-          minikube image load ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}
-          # Проверка, что образ загружен
-          minikube image ls | grep ${{ steps.sha.outputs.short_sha }}
-
-      - name: Update Helm values
-        run: |
-          cd myapp-chart
-          helm upgrade myapp-release . --namespace myapp \
-            --set app.image.tag=${{ steps.sha.outputs.short_sha }} \
-            --set app.image.pullPolicy=IfNotPresent \
-            --reuse-values
-
-      - name: Force remove stale pods
-        run: |
-          kubectl delete pod -l app=myapp -n myapp --force --grace-period=0 || true
-          sleep 10
 
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/myapp-flask -n myapp --timeout=5m
           kubectl get pods -n myapp
 
-      - name: Debug failing pod
+      - name: Debug if failed
         if: failure()
         run: |
-          echo "=== Pod description ==="
           kubectl describe pod -l app=myapp -n myapp
-          echo "=== Pod logs ==="
           kubectl logs -l app=myapp -n myapp --tail=100
 
       - name: Smoke test
         run: |
           kubectl port-forward -n myapp service/myapp-service 8080:80 &
-          sleep 15
+          sleep 10
           curl -f http://localhost:8080 || (kubectl logs -l app=myapp -n myapp --tail=50 && exit 1)
           kill %1
