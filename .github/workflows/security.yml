@@ -2,46 +2,31 @@ name: Security Scan
 
 on:
   push:
-    branches: [app, main]
-  workflow_run:
-    workflows: ["Build and Publish"]
-    types:
-      - completed
-    branches: [app, main]
+    branches: [ app, main ]
 
 jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
+      - uses: actions/checkout@v4
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ secrets.GHCR_USERNAME }}
           password: ${{ secrets.GHCR_TOKEN }}
-
-      - name: Get SHA from build
+      - name: Get short SHA
         id: sha
-        run: |
-          # Извлекаем короткий хэш из завершённого workflow
-          COMMIT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
-          echo "short_sha=${COMMIT_SHA}" >> $GITHUB_OUTPUT
-
-      - name: Run Bandit (SAST)
+        run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+      - name: Run Bandit
         run: |
           pip install bandit
-          bandit -r . -ll -f json -o bandit-report.json || true
-        continue-on-error: true
-
+          bandit -r . -ll || true
       - name: Install Trivy
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-
-      - name: Scan Docker image with Trivy
+      - name: Scan Docker image
         run: |
-          trivy image --severity HIGH,CRITICAL --no-progress ghcr.io/0honeyheart0/my-ci-project/myapp:git-${{ steps.sha.outputs.short_sha }}
-
-      - name: Scan dependencies with Trivy (fs)
+          IMAGE="ghcr.io/0honeyheart0/my-ci-project/myapp:git-${{ steps.sha.outputs.short_sha }}"
+          trivy image --severity HIGH,CRITICAL --no-progress $IMAGE
+      - name: Scan dependencies
         run: trivy fs --severity HIGH,CRITICAL --no-progress .
