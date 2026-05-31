@@ -16,9 +16,9 @@ app:
   name: myapp
   replicas: 1
   image:
-    repository: ghcr.io/0honeyheart0/my-ci-project/myapp
+    repository: myapp
     tag: latest        
     pullPolicy: IfNotPresent
-  containerPort: 5000 
+  containerPort: 5000
   servicePort: 80
   jwtSecret: jwt-secret-key
