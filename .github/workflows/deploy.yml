@@ -1,6 +1,8 @@
 name: Deploy to Minikube
 
 on:
+  push:
+    branches: [ app, main ]
   workflow_run:
     workflows: ["Build and Publish"]
     types:
