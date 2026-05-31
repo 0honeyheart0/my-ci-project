@@ -14,50 +14,39 @@ jobs:
     runs-on: self-hosted
     if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Determine commit SHA
-        id: sha
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
-          else
-            COMMIT_SHA="${{ github.sha }}"
-          fi
-          SHORT_SHA=$(echo ${COMMIT_SHA} | cut -c1-7)
-          echo "short_sha=git-${SHORT_SHA}" >> $GITHUB_OUTPUT
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Start Minikube
         run: |
           minikube status || minikube start --driver=docker --cpus=4 --memory=8192
           kubectl config use-context minikube
 
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USERNAME }}" --password-stdin
+      - name: Build Docker image
+        run: docker build -t myapp:latest .
 
-      - name: Pull and load image (debug)
-        run: |
-          IMAGE="ghcr.io/0honeyheart0/my-ci-project/myapp:${{ steps.sha.outputs.short_sha }}"
-          echo "Pulling $IMAGE"
-          docker pull $IMAGE || echo "Pull failed, will try to use local cache"
-          minikube image load $IMAGE || echo "Load failed"
-          # Проверка, что образ загружен
-          minikube image ls | grep ${{ steps.sha.outputs.short_sha }} || echo "Image not loaded"
+      - name: Load image into Minikube
+        run: minikube image load myapp:latest
 
-      - name: Deploy with Helm (use local image)
+      - name: Deploy with Helm
         run: |
           cd myapp-chart
           helm upgrade --install myapp-release . --namespace myapp --create-namespace \
-            --set app.image.tag=${{ steps.sha.outputs.short_sha }} \
+            --set app.image.repository=myapp \
+            --set app.image.tag=latest \
             --set app.image.pullPolicy=IfNotPresent
 
+      - name: Force delete old pods (if stuck)
+        run: |
+          kubectl delete pod -l app=myapp -n myapp --force --grace-period=0 || true
+          sleep 10
+
       - name: Wait for rollout
-        run: kubectl rollout status deployment/myapp-flask -n myapp --timeout=3m
+        run: kubectl rollout status deployment/myapp-flask -n myapp --timeout=5m
 
       - name: Smoke test
         run: |
           kubectl port-forward -n myapp service/myapp-service 8080:80 &
-          sleep 10
+          sleep 15
           curl -f http://localhost:8080 || (kubectl logs -n myapp deployment/myapp-flask --tail=50 && exit 1)
           kill %1
