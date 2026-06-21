@@ -29,3 +29,4 @@ jobs:
 
       - name: Scan dependencies (filesystem)
         run: trivy fs --severity HIGH,CRITICAL --no-progress .
+
