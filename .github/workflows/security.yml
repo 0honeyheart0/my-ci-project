@@ -4,6 +4,10 @@ on:
   push:
     branches: [ app, main ]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   security:
     runs-on: ubuntu-latest
@@ -19,14 +23,27 @@ jobs:
       - name: Run Bandit (SAST)
         run: |
           pip install bandit
-          bandit -r . -ll || true
+          bandit -r . -ll -f html -o bandit-report.html || true
 
       - name: Install Trivy
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Scan local Docker image
-        run: trivy image --severity HIGH,CRITICAL --no-progress myapp:latest
+      - name: Scan local Docker image (SARIF)
+        run: |
+          trivy image --severity HIGH,CRITICAL --format sarif --output trivy-image.sarif myapp:latest
 
-      - name: Scan dependencies (filesystem)
-        run: trivy fs --severity HIGH,CRITICAL --no-progress .
+      - name: Scan dependencies (filesystem) (SARIF)
+        run: |
+          trivy fs --severity HIGH,CRITICAL --format sarif --output trivy-fs.sarif .
 
+      - name: Upload SARIF to GitHub (image)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      - name: Upload SARIF to GitHub (filesystem)
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
