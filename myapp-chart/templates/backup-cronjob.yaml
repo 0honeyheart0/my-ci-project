@@ -1,0 +1,38 @@
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.app.name }}-backup
+  namespace: {{ .Release.Namespace }}
+spec:
+  schedule: "{{ .Values.backup.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: postgres:15-alpine
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.serviceName }}-secret
+                  key: password
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              TIMESTAMP=$(date +\%Y\%m\%d-\%H\%M\%S)
+              pg_dump -h {{ .Values.postgres.serviceName }} -U {{ .Values.postgres.user }} {{ .Values.postgres.database }} > /backup/backup-${TIMESTAMP}.sql 2>&1
+              find /backup -name "*.sql" -mtime +{{ .Values.backup.retentionDays }} -delete
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          restartPolicy: OnFailure
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: {{ .Values.app.name }}-backup-pvc
+{{- end }}
