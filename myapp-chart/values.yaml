@@ -22,3 +22,10 @@ app:
   containerPort: 5000
   servicePort: 80
   jwtSecret: jwt-secret-key
+  
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  storageSize: 1Gi
+  retentionDays: 7 
+
