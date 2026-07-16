@@ -19,7 +19,7 @@ jobs:
 
       - name: Start Minikube
         run: |
-          minikube status || minikube start --driver=docker --cpus=4 --memory=8192
+          minikube status || minikube start --driver=docker --cpus=2 --memory=2048
           kubectl config use-context minikube
 
       - name: Build Docker image
@@ -35,8 +35,9 @@ jobs:
             --set app.image.repository=myapp \
             --set app.image.tag=latest \
             --set app.image.pullPolicy=IfNotPresent
+            --set backup.enabled=true
 
-      - name: Force delete old pods (if stuck)
+      - name: Force delete old pods
         run: |
           kubectl delete pod -l app=myapp -n myapp --force --grace-period=0 || true
           sleep 10
@@ -50,3 +51,9 @@ jobs:
           sleep 15
           curl -f http://localhost:8080 || (kubectl logs -n myapp deployment/myapp-flask --tail=50 && exit 1)
           kill %1
+
+      - name: Rollback
+        if: failure()
+        run: |
+        helm rollback myapp-release -n myapp
+        kubectl rollout status deployment/myapp-flask -n myapp --timeout=3m
