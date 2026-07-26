@@ -52,13 +52,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
 
-      - name: Sign image
-        env:
-          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-        run: |
-          IMAGE=$(echo "${{ steps.meta.outputs.tags }}" | head -1 | tr -d '\n')
-          cosign sign --key env://COSIGN_PRIVATE_KEY $IMAGE
+
