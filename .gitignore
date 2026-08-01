@@ -1,6 +1,5 @@
 cosign.key
 cosign.pub
 terraform/terraform.tfvars
-
 terraform/*.tfstate
 terraform/*.tfstate.backup
