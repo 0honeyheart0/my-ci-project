@@ -14,62 +14,84 @@ provider "yandex" {
   zone      = var.zone
 }
 
-resource "yandex_compute_instance" "vm" {
-  name        = "tofu-vm"
-  platform_id = "standard-v3"
-  zone        = var.zone
-
-  resources {
-    cores  = 2
-    memory = 2
-  }
-
-  boot_disk {
-    initialize_params {
-      image_id = "fd8020c5t6gei8d1rpi1"
-      size     = 20
-    }
-  }
-
-  network_interface {
-    subnet_id = yandex_vpc_subnet.default.id
-    nat       = true
-     security_group_ids = [yandex_vpc_security_group.ssh.id]
-  }
-
-  metadata = {
-    ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
-  }
-}
-
 resource "yandex_vpc_network" "default" {
-  name = "tofu-network"
+  name = "k8s-network"
 }
 
 resource "yandex_vpc_subnet" "default" {
-  name           = "tofu-subnet"
-  zone           = var.zone
-  network_id     = yandex_vpc_network.default.id
+  name = "k8s-subnet"
+  zone = var.zone
+  network_id = yandex_vpc_network.default.id
   v4_cidr_blocks = ["192.168.10.0/24"]
+  }
+
+resource "yandex_iam_service_account" "k8s_sa" {
+  name = "k8s-sa"
 }
 
-output "vm_ip" {
-  value = yandex_compute_instance.vm.network_interface[0].nat_ip_address
+resource "yandex_resourcemanager_folder_iam_member" "k8s_editor" {
+  folder_id = var.folder_id
+  role      = "editor"
+  member    = "serviceAccount:${yandex_iam_service_account.k8s_sa.id}"
 }
 
-resource "yandex_vpc_security_group" "ssh" {
-  name        = "allow-ssh"
-  description = "Allow SSH access"
+resource "yandex_kubernetes_cluster" "my_cluster" {
+  name        = "my-k8s-cluster"
+  description = "Managed Kubernetes cluster for myapp"
   network_id  = yandex_vpc_network.default.id
+  folder_id   = var.folder_id
 
-  ingress {
-    protocol       = "TCP"
-    port           = 22
-    v4_cidr_blocks = ["0.0.0.0/0"]
+  master {
+    version   = "1.30"         
+    public_ip = true            
   }
 
-  egress {
-    protocol       = "ANY"
-    v4_cidr_blocks = ["0.0.0.0/0"]
+   service_account_id      = yandex_iam_service_account.k8s_sa.id
+  node_service_account_id = yandex_iam_service_account.k8s_sa.id
+}
+
+resource "yandex_kubernetes_node_group" "main" {
+  cluster_id = yandex_kubernetes_cluster.my_cluster.id
+  name       = "main-node-group"
+  
+  scale_policy {
+    fixed_scale {
+      size = 2
+    }
   }
+  
+   instance_template {
+    platform_id = "standard-v3"
+
+    resources {
+      memory = 4
+      cores  = 2
+    }
+
+    boot_disk {
+      size = 20
+      type = "network-ssd"
+    }
+
+    network_interface {
+      subnet_ids = [yandex_vpc_subnet.default.id]
+    }
+    
+    metadata = {
+      ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
+    }
+  }
+  
+  maintenance_policy {
+    auto_upgrade = true
+    auto_repair  = true
+  }
+}
+
+output "cluster_ip" {
+  value = yandex_kubernetes_cluster.my_cluster.master[0].public_ip
+}
+
+output "kubeconfig_command" {
+  value = "yc managed-kubernetes cluster get-credentials my-k8s-cluster --external"
 }

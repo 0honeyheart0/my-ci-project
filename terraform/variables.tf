@@ -1,8 +1,3 @@
-#variable "yc_token" {
- # description = "Yandex Cloud API token"
-  #sensitive   = true
-#}
-
 variable "cloud_id" {
   description = "Yandex Cloud ID"
 }
