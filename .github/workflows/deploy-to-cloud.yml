@@ -1,0 +1,63 @@
+name: Deploy to Yandex Managed Kubernetes
+
+on:
+  push:
+    branches: [ main, app ]
+
+env:
+  YC_SA_KEY_JSON: ${{ secrets.YC_SA_KEY_JSON }}
+  YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+  YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Yandex Cloud CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Terraform Init
+        run: terraform -chdir=terraform init
+
+      - name: Terraform Apply (create cluster)
+        run: terraform -chdir=terraform apply -auto-approve
+        env:
+          TF_VAR_cloud_id: ${{ secrets.YC_CLOUD_ID }}
+          TF_VAR_folder_id: ${{ secrets.YC_FOLDER_ID }}
+
+      - name: Get kubeconfig
+        run: |
+          yc config set service-account-key <(echo "$YC_SA_KEY_JSON")
+          yc managed-kubernetes cluster get-credentials my-k8s-cluster --external
+
+      - name: Deploy with Helm
+        run: |
+          cd myapp-chart
+          helm upgrade --install myapp-release . \
+            --namespace myapp --create-namespace \
+            --set app.image.repository=myapp \
+            --set app.image.tag=latest \
+            --set app.image.pullPolicy=IfNotPresent \
+            --set service.type=LoadBalancer
+
+      - name: Wait for LoadBalancer
+        run: |
+          kubectl -n myapp wait --for=condition=ready service/myapp-release --timeout=120s
+          EXTERNAL_IP=$(kubectl -n myapp get svc myapp-release -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Application available at http://$EXTERNAL_IP"
