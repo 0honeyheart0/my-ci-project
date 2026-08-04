@@ -25,14 +25,8 @@ resource "yandex_vpc_subnet" "default" {
   v4_cidr_blocks = ["192.168.10.0/24"]
   }
 
-resource "yandex_iam_service_account" "k8s_sa" {
-  name = "k8s-sa"
-}
-
-resource "yandex_resourcemanager_folder_iam_member" "k8s_editor" {
-  folder_id = var.folder_id
-  role      = "editor"
-  member    = "serviceAccount:${yandex_iam_service_account.k8s_sa.id}"
+data "yandex_iam_service_account" "k8s_sa" {
+  name = "k8s-sa"  
 }
 
 resource "yandex_kubernetes_cluster" "my_cluster" {
@@ -42,25 +36,28 @@ resource "yandex_kubernetes_cluster" "my_cluster" {
   folder_id   = var.folder_id
 
   master {
-    version   = "1.30"         
-    public_ip = true            
+    version   = "1.34"
+    public_ip = true
+    master_location {
+      zone = var.zone
+      }  
   }
 
-   service_account_id      = yandex_iam_service_account.k8s_sa.id
-  node_service_account_id = yandex_iam_service_account.k8s_sa.id
+  service_account_id      = data.yandex_iam_service_account.k8s_sa.id
+  node_service_account_id = data.yandex_iam_service_account.k8s_sa.id
 }
 
 resource "yandex_kubernetes_node_group" "main" {
   cluster_id = yandex_kubernetes_cluster.my_cluster.id
   name       = "main-node-group"
-  
+
   scale_policy {
     fixed_scale {
       size = 2
     }
   }
-  
-   instance_template {
+
+  instance_template {
     platform_id = "standard-v3"
 
     resources {
@@ -69,19 +66,19 @@ resource "yandex_kubernetes_node_group" "main" {
     }
 
     boot_disk {
-      size = 20
-      type = "network-ssd"
+      size = 50
+      type = "network-hdd"
     }
 
     network_interface {
       subnet_ids = [yandex_vpc_subnet.default.id]
     }
-    
+
     metadata = {
       ssh-keys = "ubuntu:${file("~/.ssh/id_ed25519.pub")}"
     }
   }
-  
+
   maintenance_policy {
     auto_upgrade = true
     auto_repair  = true
