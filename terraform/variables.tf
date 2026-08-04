@@ -1,3 +1,8 @@
+variable "ssh_public_key" {
+  description = "Public SSH key for VM access"
+  sensitive   = true
+}
+
 variable "cloud_id" {
   description = "Yandex Cloud ID"
 }
