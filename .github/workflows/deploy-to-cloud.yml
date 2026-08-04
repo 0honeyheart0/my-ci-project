@@ -23,9 +23,10 @@ jobs:
 
       - name: Create YC key file
         run: |
-          sudo mkdir -p /home/kali/.config/yandex
-          echo '${{ secrets.YC_SA_KEY_JSON }}' > /home/kali/.config/yandex/authorized_key.json
-          chmod 600 /home/kali/.config/yandex/authorized_key.json
+          mkdir -p /tmp
+          echo '${{ secrets.YC_SA_KEY_JSON }}' > /tmp/yc_key.json
+          chmod 600 /tmp/yc_key.json
+          cat /tmp/yc_key.json | jq .   # проверка, что JSON валидный
 
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v3
@@ -50,7 +51,7 @@ jobs:
 
       - name: Get kubeconfig
         run: |
-          yc config set service-account-key <(echo "$YC_SA_KEY_JSON")
+          yc config set service-account-key /tmp/yc_key.json
           yc managed-kubernetes cluster get-credentials my-k8s-cluster --external
 
       - name: Deploy with Helm
