@@ -23,7 +23,7 @@ jobs:
 
       - name: Create YC key file
         run: |
-          mkdir -p /home/kali/.config/yandex
+          sudo mkdir -p /home/kali/.config/yandex
           echo '${{ secrets.YC_SA_KEY_JSON }}' > /home/kali/.config/yandex/authorized_key.json
           chmod 600 /home/kali/.config/yandex/authorized_key.json
 
