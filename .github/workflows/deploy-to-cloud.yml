@@ -49,8 +49,8 @@ jobs:
           helm upgrade --install myapp-release . \
             --namespace myapp --create-namespace \
             --set app.image.repository=ghcr.io/0honeyheart0/my-ci-project/myapp \
-            --set app.image.tag=latest \
-            --set app.image.pullPolicy=IfNotPresent \
+            --set app.image.tag=git-985f321 \
+            --set app.image.pullPolicy=Always \
             --set service.type=LoadBalancer
 
       - name: Debug Helm release
