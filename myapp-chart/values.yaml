@@ -23,6 +23,9 @@ app:
   servicePort: 80
   jwtSecret: jwt-secret-key
   
+imagePullSecrets:
+  - name: ghcr-secret
+  
 backup:
   enabled: true
   schedule: "0 2 * * *"
