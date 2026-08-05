@@ -12,8 +12,6 @@ spec:
       labels:
         app: {{ .Values.app.name }}
     spec:
-      imagePullSecrets:
-        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
       containers:
       - name: {{ .Values.app.name }}
         image: "{{ .Values.app.image.repository }}:{{ .Values.app.image.tag }}"
