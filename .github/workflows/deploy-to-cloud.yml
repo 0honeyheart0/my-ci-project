@@ -51,7 +51,7 @@ jobs:
             --set app.image.repository=ghcr.io/0honeyheart0/my-ci-project/myapp \
             --set app.image.tag=latest \
             --set app.image.pullPolicy=Always \
-            --set service.type=LoadBalancer
+            --set service.type=LoadBalancer \
             --set imagePullSecrets[0].name=ghcr-secret
 
       - name: Debug Helm release
