@@ -53,6 +53,12 @@ jobs:
             --set app.image.pullPolicy=IfNotPresent \
             --set service.type=LoadBalancer
 
+      - name: Debug Helm release
+        run: |
+          helm list -n myapp
+          kubectl get svc -n myapp
+          kubectl get pods -n myapp
+
       - name: Wait for LoadBalancer
         run: |
           kubectl -n myapp wait --for=condition=ready service/myapp-release --timeout=120s
