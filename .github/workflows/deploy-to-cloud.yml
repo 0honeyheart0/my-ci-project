@@ -42,7 +42,7 @@ jobs:
       - name: Get kubeconfig
         run: |
           yc config set service-account-key /home/kali/.config/yandex/authorized_key.json
-          yc managed-kubernetes cluster get-credentials my-k8s-cluster --external
+          yc managed-kubernetes cluster get-credentials cat517dhs9533pge7dtn --external
       - name: Deploy with Helm
         run: |
           cd myapp-chart
