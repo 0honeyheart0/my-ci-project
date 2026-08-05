@@ -2,7 +2,7 @@ name: Build and Publish
 
 on:
   push:
-    branches: [ main, app, feature/* ]
+    branches: [ main, app ]
   pull_request:
     branches: [ main ]
 
@@ -38,7 +38,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=git-,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
             type=ref,event=branch
             type=ref,event=pr
 
