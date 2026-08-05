@@ -52,6 +52,7 @@ jobs:
             --set app.image.tag=latest \
             --set app.image.pullPolicy=Always \
             --set service.type=LoadBalancer
+            --set imagePullSecrets[0].name=ghcr-secret
 
       - name: Debug Helm release
         run: |
