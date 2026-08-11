@@ -29,66 +29,29 @@ data "yandex_iam_service_account" "k8s_sa" {
   name = "k8s-sa"  
 }
 
-resource "yandex_kubernetes_cluster" "my_cluster" {
-  name        = "my-k8s-cluster"
-  description = "Managed Kubernetes cluster for myapp"
-  network_id  = yandex_vpc_network.default.id
-  folder_id   = var.folder_id
+module "k8s" {
+  source = "./modules/k8s-cluster"
 
-  master {
-    version   = "1.34"
-    public_ip = true
-    master_location {
-      zone = var.zone
-      }  
-  }
-
-  service_account_id      = data.yandex_iam_service_account.k8s_sa.id
+  cluster_name        = "my-k8s-cluster"
+  cluster_description = "Managed K8s cluster for myapp"
+  network_id          = yandex_vpc_network.default.id
+  folder_id           = var.folder_id
+  zone                = var.zone
+  k8s_version         = "1.31"
+  service_account_id  = data.yandex_iam_service_account.k8s_sa.id
   node_service_account_id = data.yandex_iam_service_account.k8s_sa.id
-}
-
-resource "yandex_kubernetes_node_group" "main" {
-  cluster_id = yandex_kubernetes_cluster.my_cluster.id
-  name       = "main-node-group"
-
-  scale_policy {
-    fixed_scale {
-      size = 2
-    }
-  }
-
-  instance_template {
-    platform_id = "standard-v3"
-
-    resources {
-      memory = 4
-      cores  = 2
-    }
-
-    boot_disk {
-      size = 50
-      type = "network-hdd"
-    }
-
-    network_interface {
-      subnet_ids = [yandex_vpc_subnet.default.id]
-    }
-
-    metadata = {
-      ssh-keys = "ubuntu:${var.ssh_public_key}"
-    }
-  }
-
-  maintenance_policy {
-    auto_upgrade = true
-    auto_repair  = true
-  }
+  subnet_id           = yandex_vpc_subnet.default.id
+  node_count          = 2
+  node_cores          = 2
+  node_memory         = 4
+  node_disk_size      = 50
+  ssh_public_key      = var.ssh_public_key
 }
 
 output "cluster_ip" {
-  value = yandex_kubernetes_cluster.my_cluster.master[0].public_ip
+  value = module.k8s.cluster_ip
 }
 
-output "kubeconfig_command" {
-  value = "yc managed-kubernetes cluster get-credentials my-k8s-cluster --external"
+output "cluster_id" {
+  value = module.k8s.cluster_id
 }

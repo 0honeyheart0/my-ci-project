@@ -3,7 +3,12 @@ kind: Deployment
 metadata:
   name: myapp-flask
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
   selector:
     matchLabels:
       app: myapp-flask
@@ -12,6 +17,7 @@ spec:
       labels:
         app: myapp-flask
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
       - name: myapp
         image: myapp:latest
@@ -37,3 +43,21 @@ spec:
             secretKeyRef:
               name: flask-secret
               key: jwt-secret-key
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /startup
+            port: 5000
+          failureThreshold: 30
+          periodSeconds: 10
