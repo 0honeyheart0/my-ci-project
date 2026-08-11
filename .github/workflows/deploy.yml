@@ -55,5 +55,5 @@ jobs:
       - name: Rollback
         if: failure()
         run: |
-        helm rollback myapp-release -n myapp
-        kubectl rollout status deployment/myapp-flask -n myapp --timeout=3m
+          helm rollback myapp-release -n myapp
+          kubectl rollout status deployment/myapp-flask -n myapp --timeout=3m
