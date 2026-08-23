@@ -1,30 +1,31 @@
 ---
-- name: Initial server setup
-  hosts: vps
+- name: Deploy Flask app on Yandex Cloud VM
+  hosts: web
   become: yes
+  vars:
+    app_dir: /opt/myapp
+    compose_file: docker-compose.yml
 
   tasks:
-    - name: Update apt cache
+
+    - name: Update 
       apt:
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: Install essential packages
-      apt:
-        name:
-          - curl
-          - git
-          - htop
-          - ufw
-          - rsync
-        state: present
-
-    - name: Install dependencies for Docker
+    - name: depends
       apt:
         name:
           - apt-transport-https
           - ca-certificates
+          - curl
           - software-properties-common
+          - python3-pip
+          - virtualenv
+          - python3-setuptools
+          - gnupg
+          - lsb-release
+          - git
         state: present
 
     - name: Add Docker GPG key
@@ -34,7 +35,7 @@
 
     - name: Add Docker repository
       apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable"
         state: present
 
     - name: Install Docker
@@ -42,94 +43,62 @@
         name: docker-ce
         state: present
 
-    - name: Start and enable Docker
-      systemd:
-        name: docker
-        state: started
-        enabled: yes
+    - name: Install Docker Compose (standalone)
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ ansible_system | lower }}-{{ ansible_architecture }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
 
     - name: Add user to docker group
       user:
-        name: "{{ ansible_user }}"
+        name: ubuntu
         groups: docker
         append: yes
 
-    - name: Install Docker Python SDK via apt
-      apt:
-        name: python3-docker
-        state: present
-
     - name: Create app directory
       file:
-        path: /opt/myapp
+        path: "{{ app_dir }}"
         state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
 
-    - name: Copy application files using synchronize (rsync)
+    - name: Copy project files
       synchronize:
-        src: ./
-        dest: /opt/myapp
-        delete: yes
+        src: /home/kali/my-ci-project/
+        dest: "{{ app_dir }}"
         rsync_opts:
           - "--exclude=.git"
-          - "--exclude=inventory.ini"
-          - "--exclude=playbook.yml"
+          - "--exclude=__pycache__"
+          - "--exclude=.env"
+          - "--exclude=*.pyc"
+          - "--exclude=venv"
+          - "--exclude=.terraform"
+          - "--exclude=*.tfstate*"
       delegate_to: 127.0.0.1
       become: false
 
-    - name: Build Docker image
-      docker_image:
-        name: myapp:latest
-        build:
-          path: /opt/myapp
-        source: build
+    - name: Run docker-compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
         state: present
+        recreate: always
+      register: compose_output
 
-    - name: Run container
-      docker_container:
-        name: myapp
-        image: myapp:latest
-        state: started
-        restart_policy: always
-        ports:
-          - "5000:5000"
+    - name: Show compose output
+      debug:
+        msg: "{{ compose_output }}"
 
-    - name: Install Nginx
-      apt:
-        name: nginx
-        state: present
+    - name: Wait for app to be ready
+      uri:
+        url: http://localhost:5000
+        status_code: 200
+        timeout: 30
+      register: result
+      until: result.status == 200
+      retries: 10
+      delay: 5
 
-    - name: Remove default Nginx site
-      file:
-        path: /etc/nginx/sites-enabled/default
-        state: absent
-
-    - name: Deploy reverse proxy configuration
-      template:
-        src: nginx-reverse-proxy.conf.j2
-        dest: /etc/nginx/sites-available/myapp
-      notify: restart nginx
-
-    - name: Enable site
-      file:
-        src: /etc/nginx/sites-available/myapp
-        dest: /etc/nginx/sites-enabled/myapp
-        state: link
-      notify: restart nginx
-
-    - name: Ensure Nginx is running and enabled
-      systemd:
-        name: nginx
-        state: started
-        enabled: yes
-
-    - name: Allow HTTP in firewall (UFW)
-      ufw:
-        rule: allow
-        port: '80'
-        proto: tcp
-
-  handlers:
-    - name: restart nginx
-      systemd:
-        name: nginx
-        state: restarted
+    - name: Show app URL
+      debug:
+        msg: "Application available at http://{{ ansible_default_ipv4.address }}:5000"
