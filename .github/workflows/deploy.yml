@@ -19,7 +19,7 @@ jobs:
 
       - name: Start Minikube
         run: |
-          minikube status || minikube start --driver=docker --cpus=2 --memory=2048
+          minikube status || minikube start --driver=docker --cpus=4 --memory=4096
           kubectl config use-context minikube
 
       - name: Build Docker image
