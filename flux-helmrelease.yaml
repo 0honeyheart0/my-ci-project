@@ -1,0 +1,23 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: myapp
+  namespace: flux-system
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: ./myapp-chart
+      sourceRef:
+        kind: GitRepository
+        name: myapp
+  targetNamespace: myapp
+  install:
+    createNamespace: true
+  values:
+    app:
+      image:
+        repository: ghcr.io/0honeyheart0/my-ci-project/myapp
+        tag: latest
+    service:
+      type: ClusterIP
