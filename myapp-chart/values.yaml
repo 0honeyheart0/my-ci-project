@@ -9,7 +9,7 @@ postgres:
     size: 1Gi
   image:
     repository: postgres
-    tag: git-c8f3d18
+    tag: git-e122454
     pullPolicy: IfNotPresent
 
 app:
@@ -17,7 +17,7 @@ app:
   replicas: 1
   image:
     repository: myapp
-    tag: git-c8f3d18
+    tag: git-e122454
     pullPolicy: IfNotPresent
   containerPort: 5000
   servicePort: 80
