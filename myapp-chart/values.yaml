@@ -9,7 +9,7 @@ postgres:
     size: 1Gi
   image:
     repository: postgres
-    tag: "15-alpine"
+    tag: git-ad7be3a
     pullPolicy: IfNotPresent
 
 app:
@@ -17,7 +17,7 @@ app:
   replicas: 1
   image:
     repository: myapp
-    tag: git-5a45bd4
+    tag: git-ad7be3a
     pullPolicy: IfNotPresent
   containerPort: 5000
   servicePort: 80
