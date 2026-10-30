@@ -3,7 +3,7 @@ import json
 import time
 
 producer = KafkaProducer(
-    bootstrap_servers='localhost:9092', 
+    bootstrap_servers='localhost:9092',          # ← kafka:9092, т.к. мы прописали /etc/hosts
     value_serializer=lambda v: json.dumps(v).encode('utf-8'),
     key_serializer=lambda k: k.encode('utf-8')
 )
