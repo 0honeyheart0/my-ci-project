@@ -9,7 +9,7 @@ postgres:
     size: 1Gi
   image:
     repository: postgres
-    tag: git-5a45bd4
+    tag: "15-alpine"
     pullPolicy: IfNotPresent
 
 app:
