@@ -16,9 +16,9 @@ app:
   name: myapp
   replicas: 1
   image:
-    repository: myapp
-    tag: git-de221f6
-    pullPolicy: IfNotPresent
+    repository: ghcr.io/0honeyheart0/my-ci-project/myapp
+    tag: git-5a45bd4
+    pullPolicy: Always
   containerPort: 5000
   servicePort: 80
   jwtSecret: jwt-secret-key

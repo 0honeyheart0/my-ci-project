@@ -8,16 +8,10 @@ spec:
   chart:
     spec:
       chart: ./myapp-chart
-      reconcileStrategy: Revision
       sourceRef:
         kind: GitRepository
-        name: myapp
+        name: flux-system
+        namespace: flux-system
   targetNamespace: myapp
   install:
     createNamespace: true
-  values:
-    app:
-      image:
-        repository: ghcr.io/0honeyheart0/my-ci-project/myapp
-    service:
-      type: ClusterIP
