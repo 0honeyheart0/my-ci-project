@@ -9,8 +9,8 @@ postgres:
     size: 1Gi
   image:
     repository: postgres
-    tag: git-de221f6
-    pullPolicy: IfNotPresent
+    tag: "15-alpine"
+    pullPolicy: Always
 
 app:
   name: myapp

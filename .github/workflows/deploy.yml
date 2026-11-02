@@ -1,59 +1,60 @@
-name: Deploy to Minikube
+#name: Deploy to Minikube
 
-on:
-  push:
-    branches: [ app, main ]
-  workflow_run:
-    workflows: ["Build and Publish"]
-    types:
-      - completed
-    branches: [app, main]
+#on:
+#  push:
+#    branches: [ app, main ]
+#  workflow_run:
+#    workflows: ["Build and Publish"]
+#    types:
+#      - completed
+#    branches: [app, main]
 
-jobs:
-  deploy:
-    runs-on: self-hosted
-    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+#jobs:
+#  deploy:
+#    runs-on: self-hosted
+#    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v4
 
-      - name: Start Minikube
-        run: |
-          minikube status || minikube start --driver=docker --cpus=4 --memory=4096
-          kubectl config use-context minikube
+#      - name: Start Minikube
+#        run: |
+#          minikube status || minikube start --driver=docker --cpus=4 --memory=4096
+#          kubectl config use-context minikube
 
-      - name: Build Docker image
-        run: docker build -t myapp:latest .
+#      - name: Build Docker image
+#        run: docker build -t myapp:latest .
+#
+ #     - name: Load image into Minikube
+  #      run: minikube image load myapp:latest
 
-      - name: Load image into Minikube
-        run: minikube image load myapp:latest
+   #   - name: Deploy with Helm
+    #    run: |
+     #     cd myapp-chart
+      #    helm upgrade --install myapp-release . --namespace myapp --create-namespace \
+       #     --set app.image.repository=myapp \
+        #    --set app.image.tag=latest \
+         #   --set app.image.pullPolicy=IfNotPresent \
+          #  --set backup.enabled=true
 
-      - name: Deploy with Helm
-        run: |
-          cd myapp-chart
-          helm upgrade --install myapp-release . --namespace myapp --create-namespace \
-            --set app.image.repository=myapp \
-            --set app.image.tag=latest \
-            --set app.image.pullPolicy=IfNotPresent \
-            --set backup.enabled=true
+#      - name: Force delete old pods
+ #       run: |
+  #        kubectl delete pod -l app=myapp -n myapp --force --grace-period=0 || true
+   #       sleep 10
+#
+ #     - name: Wait for rollout
+  #      run: kubectl rollout status deployment/myapp-flask -n myapp --timeout=5m
 
-      - name: Force delete old pods
-        run: |
-          kubectl delete pod -l app=myapp -n myapp --force --grace-period=0 || true
-          sleep 10
+   #   - name: Smoke test
+    #    run: |
+     #     kubectl port-forward -n myapp service/myapp-service 8080:80 &
+      #    sleep 15
+       #   curl -f http://localhost:8080 || (kubectl logs -n myapp deployment/myapp-flask --tail=50 && exit 1)
+        #  kill %1
 
-      - name: Wait for rollout
-        run: kubectl rollout status deployment/myapp-flask -n myapp --timeout=5m
-
-      - name: Smoke test
-        run: |
-          kubectl port-forward -n myapp service/myapp-service 8080:80 &
-          sleep 15
-          curl -f http://localhost:8080 || (kubectl logs -n myapp deployment/myapp-flask --tail=50 && exit 1)
-          kill %1
-
-      - name: Rollback
-        if: failure()
-        run: |
-          helm rollback myapp-release -n myapp
-          kubectl rollout status deployment/myapp-flask -n myapp --timeout=3m
+#      - name: Rollback
+ #       if: failure()
+  #      run: |
+   #       helm rollback myapp-release -n myapp
+    #      kubectl rollout status deployment/myapp-flask -n myapp --timeout=3m
+#
