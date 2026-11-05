@@ -37,5 +37,5 @@ spec:
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.app.name }}-secret
+              name: myapp-db-secret
               key: password
