@@ -5,3 +5,5 @@ resources:
   - myapp-helmrelease.yaml
   - eso-secretstore.yaml
   - eso-externalsecret.yaml
+  - cilium-helmrelease.yaml
+  - cilium-repo.yaml
